@@ -16,6 +16,7 @@
       "android": {
         "buildType": "apk"
       },
+      "packageManager": "npm",
       "env": {
         "NPM_FLAGS": "--legacy-peer-deps"
       }
