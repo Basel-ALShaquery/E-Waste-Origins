@@ -6,6 +6,8 @@ import { useAuth, useAlert } from '@/template';
 import { theme } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+// ✅ FIX 1: Import the router
+import { router } from 'expo-router';
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -33,9 +35,15 @@ export default function AuthScreen() {
       showAlert('Invalid Password', 'Password must be at least 6 characters');
       return;
     }
+
     const { error } = await signInWithPassword(email, password);
     if (error) {
       showAlert('Login Failed', error);
+    } else {
+      // ✅ FIX 2: Short delay to allow session to be stored before navigation
+      setTimeout(() => {
+        router.replace('/(tabs)'); // Make sure '/(tabs)' is your main app route
+      }, 100);
     }
   };
 
@@ -56,9 +64,15 @@ export default function AuthScreen() {
       showAlert('Password Mismatch', 'Passwords do not match');
       return;
     }
+
     const { error } = await signUpWithPassword(email, password);
     if (error) {
       showAlert('Sign Up Failed', error);
+    } else {
+      // ✅ FIX 2: Short delay after signup as well
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 100);
     }
   };
 
