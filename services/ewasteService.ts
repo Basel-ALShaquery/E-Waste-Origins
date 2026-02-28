@@ -68,6 +68,14 @@ const DEVICE_POINTS: Record<string, number> = {
   other: 5,
 };
 
+// Helper function to safely extract error message
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') return error.message;
+  return 'Unknown error occurred';
+};
+
 export const ewasteService = {
   // E-waste items
   async createEwasteItem(data: {
@@ -77,58 +85,78 @@ export const ewasteService = {
     description?: string;
     photo_url?: string;
   }) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: 'Not authenticated' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: null, error: 'Not authenticated' };
 
-    const points = (DEVICE_POINTS[data.device_type.toLowerCase()] || DEVICE_POINTS.other) * data.quantity;
+      const points = (DEVICE_POINTS[data.device_type.toLowerCase()] || DEVICE_POINTS.other) * data.quantity;
 
-    const { data: item, error } = await supabase
-      .from('ewaste_items')
-      .insert({
-        user_id: user.id,
-        ...data,
-        points_earned: points,
-      })
-      .select()
-      .single();
+      const { data: item, error } = await supabase
+        .from('ewaste_items')
+        .insert({
+          user_id: user.id,
+          ...data,
+          points_earned: points,
+        })
+        .select()
+        .single();
 
-    return { data: item, error: error?.message || null };
+      if (error) throw error;
+      return { data: item, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async getUserEwasteItems() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: 'Not authenticated' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: null, error: 'Not authenticated' };
 
-    const { data, error } = await supabase
-      .from('ewaste_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('ewaste_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async getAllEwasteItems() {
-    const { data, error } = await supabase
-      .from('ewaste_items')
-      .select(`
-        *,
-        user_profiles (username, email)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('ewaste_items')
+        .select(`
+          *,
+          user_profiles (username, email)
+        `)
+        .order('created_at', { ascending: false });
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async updateEwasteItemStatus(itemId: string, status: string) {
-    const { data, error } = await supabase
-      .from('ewaste_items')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('ewaste_items')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .select()
+        .single();
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   // Pickups
@@ -141,192 +169,251 @@ export const ewasteService = {
     phone?: string;
     notes?: string;
   }) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: 'Not authenticated' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: null, error: 'Not authenticated' };
 
-    const { data: pickup, error } = await supabase
-      .from('pickups')
-      .insert({
-        user_id: user.id,
-        ...data,
-      })
-      .select()
-      .single();
+      const { data: pickup, error } = await supabase
+        .from('pickups')
+        .insert({
+          user_id: user.id,
+          ...data,
+        })
+        .select()
+        .single();
 
-    // Update ewaste item status if linked
-    if (pickup && data.ewaste_item_id) {
-      await supabase
-        .from('ewaste_items')
-        .update({ status: 'scheduled' })
-        .eq('id', data.ewaste_item_id);
+      if (error) throw error;
+
+      // Update ewaste item status if linked
+      if (pickup && data.ewaste_item_id) {
+        await supabase
+          .from('ewaste_items')
+          .update({ status: 'scheduled' })
+          .eq('id', data.ewaste_item_id);
+      }
+
+      return { data: pickup, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
     }
-
-    return { data: pickup, error: error?.message || null };
   },
 
   async getUserPickups() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: 'Not authenticated' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { data: null, error: 'Not authenticated' };
 
-    const { data, error } = await supabase
-      .from('pickups')
-      .select(`
-        *,
-        ewaste_items (device_type, quantity, condition)
-      `)
-      .eq('user_id', user.id)
-      .order('scheduled_date', { ascending: false });
+      const { data, error } = await supabase
+        .from('pickups')
+        .select(`
+          *,
+          ewaste_items (device_type, quantity, condition)
+        `)
+        .eq('user_id', user.id)
+        .order('scheduled_date', { ascending: false });
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async getAllPickups() {
-    const { data, error } = await supabase
-      .from('pickups')
-      .select(`
-        *,
-        user_profiles (username, email),
-        ewaste_items (device_type, quantity, condition)
-      `)
-      .order('scheduled_date', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('pickups')
+        .select(`
+          *,
+          user_profiles (username, email),
+          ewaste_items (device_type, quantity, condition)
+        `)
+        .order('scheduled_date', { ascending: true });
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async updatePickupStatus(pickupId: string, status: string) {
-    const { data, error } = await supabase
-      .from('pickups')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', pickupId)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('pickups')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', pickupId)
+        .select()
+        .single();
 
-    // If completed, update linked ewaste item
-    if (data && status === 'completed' && data.ewaste_item_id) {
-      await supabase
-        .from('ewaste_items')
-        .update({ status: 'collected' })
-        .eq('id', data.ewaste_item_id);
+      if (error) throw error;
+
+      // If completed, update linked ewaste item
+      if (data && status === 'completed' && data.ewaste_item_id) {
+        await supabase
+          .from('ewaste_items')
+          .update({ status: 'collected' })
+          .eq('id', data.ewaste_item_id);
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
     }
-
-    return { data, error: error?.message || null };
   },
 
   // Rewards
   async getUserRewards(userId?: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const targetUserId = userId || user?.id;
-    if (!targetUserId) return { data: null, error: 'Not authenticated' };
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const targetUserId = userId || user?.id;
+      if (!targetUserId) return { data: null, error: 'Not authenticated' };
 
-    const { data, error } = await supabase
-      .from('user_rewards')
-      .select('*')
-      .eq('user_id', targetUserId)
-      .single();
-
-    // Create if doesn't exist
-    if (error && error.includes('0 rows')) {
-      const { data: newReward, error: createError } = await supabase
+      const { data, error } = await supabase
         .from('user_rewards')
-        .insert({ user_id: targetUserId })
-        .select()
+        .select('*')
+        .eq('user_id', targetUserId)
         .single();
-      return { data: newReward, error: createError?.message || null };
-    }
 
-    return { data, error: error?.message || null };
+      if (error && error.code === 'PGRST116') { // No rows found
+        const { data: newReward, error: createError } = await supabase
+          .from('user_rewards')
+          .insert({ user_id: targetUserId })
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        return { data: newReward, error: null };
+      }
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async updateUserRewards(userId: string, pointsToAdd: number, itemsToAdd: number) {
-    const { data: current } = await this.getUserRewards(userId);
-    
-    const newPoints = (current?.total_points || 0) + pointsToAdd;
-    const newItems = (current?.total_items_contributed || 0) + itemsToAdd;
+    try {
+      const { data: current, error: fetchError } = await this.getUserRewards(userId);
+      if (fetchError) throw new Error(fetchError);
+      
+      const newPoints = (current?.total_points || 0) + pointsToAdd;
+      const newItems = (current?.total_items_contributed || 0) + itemsToAdd;
 
-    // Calculate certificates
-    const certificates: string[] = current?.certificates || [];
-    if (newItems >= 1 && !certificates.includes('First Contributor')) {
-      certificates.push('First Contributor');
-    }
-    if (newItems >= 10 && !certificates.includes('Eco Warrior')) {
-      certificates.push('Eco Warrior');
-    }
-    if (newItems >= 50 && !certificates.includes('Recycling Champion')) {
-      certificates.push('Recycling Champion');
-    }
+      // Calculate certificates
+      const certificates: string[] = current?.certificates || [];
+      if (newItems >= 1 && !certificates.includes('First Contributor')) {
+        certificates.push('First Contributor');
+      }
+      if (newItems >= 10 && !certificates.includes('Eco Warrior')) {
+        certificates.push('Eco Warrior');
+      }
+      if (newItems >= 50 && !certificates.includes('Recycling Champion')) {
+        certificates.push('Recycling Champion');
+      }
 
-    const { data, error } = await supabase
-      .from('user_rewards')
-      .upsert({
-        user_id: userId,
-        total_points: newPoints,
-        total_items_contributed: newItems,
-        certificates,
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('user_rewards')
+        .upsert({
+          user_id: userId,
+          total_points: newPoints,
+          total_items_contributed: newItems,
+          certificates,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   async getLeaderboard() {
-    const { data, error } = await supabase
-      .from('user_rewards')
-      .select(`
-        *,
-        user_profiles (username, email)
-      `)
-      .order('total_points', { ascending: false })
-      .limit(10);
+    try {
+      const { data, error } = await supabase
+        .from('user_rewards')
+        .select(`
+          *,
+          user_profiles (username, email)
+        `)
+        .order('total_points', { ascending: false })
+        .limit(10);
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   // Drop-off locations
   async getDropOffLocations() {
-    const { data, error } = await supabase
-      .from('drop_off_locations')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
+    try {
+      const { data, error } = await supabase
+        .from('drop_off_locations')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
 
-    return { data, error: error?.message || null };
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 
   // Admin check
   async isAdmin(userId?: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const targetUserId = userId || user?.id;
-    if (!targetUserId) return false;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const targetUserId = userId || user?.id;
+      if (!targetUserId) return false;
 
-    const { data } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('id', targetUserId)
-      .single();
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('id', targetUserId)
+        .single();
 
-    return !!data;
+      if (error && error.code === 'PGRST116') return false;
+      if (error) throw error;
+      return !!data;
+    } catch (error) {
+      console.error('Error checking admin:', getErrorMessage(error));
+      return false;
+    }
   },
 
   // Admin stats
   async getAdminStats() {
-    const [itemsRes, pickupsRes, usersRes] = await Promise.all([
-      supabase.from('ewaste_items').select('status', { count: 'exact' }),
-      supabase.from('pickups').select('status', { count: 'exact' }),
-      supabase.from('user_rewards').select('total_points', { count: 'exact' }),
-    ]);
+    try {
+      const [itemsRes, pickupsRes, usersRes] = await Promise.all([
+        supabase.from('ewaste_items').select('status', { count: 'exact', head: false }),
+        supabase.from('pickups').select('status', { count: 'exact', head: false }),
+        supabase.from('user_rewards').select('total_points', { count: 'exact', head: false }),
+      ]);
 
-    const stats = {
-      totalItems: itemsRes.count || 0,
-      pendingItems: itemsRes.data?.filter(i => i.status === 'pending').length || 0,
-      collectedItems: itemsRes.data?.filter(i => i.status === 'collected').length || 0,
-      totalPickups: pickupsRes.count || 0,
-      pendingPickups: pickupsRes.data?.filter(p => p.status === 'pending').length || 0,
-      totalUsers: usersRes.count || 0,
-      totalPoints: usersRes.data?.reduce((sum, r) => sum + (r.total_points || 0), 0) || 0,
-    };
+      if (itemsRes.error) throw itemsRes.error;
+      if (pickupsRes.error) throw pickupsRes.error;
+      if (usersRes.error) throw usersRes.error;
 
-    return { data: stats, error: null };
+      const stats = {
+        totalItems: itemsRes.count || 0,
+        pendingItems: itemsRes.data?.filter(i => i.status === 'pending').length || 0,
+        collectedItems: itemsRes.data?.filter(i => i.status === 'collected').length || 0,
+        totalPickups: pickupsRes.count || 0,
+        pendingPickups: pickupsRes.data?.filter(p => p.status === 'pending').length || 0,
+        totalUsers: usersRes.count || 0,
+        totalPoints: usersRes.data?.reduce((sum, r) => sum + (r.total_points || 0), 0) || 0,
+      };
+
+      return { data: stats, error: null };
+    } catch (error) {
+      return { data: null, error: getErrorMessage(error) };
+    }
   },
 };
